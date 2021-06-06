@@ -178,11 +178,6 @@ while (True):
         tau_o = Ve / (norm(Ibrcf[1:2]) * (F / m))
 
         # d part
-        k = (V_star * (cos_theta_H_star - 1) +
-             F2_orbit(tc, tau_o) * cos_theta_HC - F2(tc, tau)) / tc**2
-        beta_t = cos_theta_HC * (norm(V) * tc + F2(tc, tau) - k * tc *
-                                 (norm(V) + deltaV - norm(Vocf_c))) / rocf_c[1]
-        beta_c = beta_e + beta_t
         count = 0
         while (abs(tc - tc_pre) > epsilon):
             # f part
@@ -216,7 +211,11 @@ while (True):
               F2(tc, tau) * sin(psi_ocf_wave)) * F0(tc, tau) / (
                   (F2(tc, tau) * F1(tc, tau) - F3(tc, tau) * F0(tc, tau)) *
                   cos(psi_ocf_wave))
-
+        k = (V_star * (cos_theta_H_star - 1) +
+             F2_orbit(tc, tau_o) * cos_theta_HC - F2(tc, tau)) / tc**2
+        beta_t = cos_theta_HC * (norm(V) * tc + F2(tc, tau) - k * tc *
+                                 (norm(V) + deltaV - norm(Vocf_c))) / rocf_c[1]
+        beta_c = beta_e + beta_t
     phi_ocf = phi_ocf_wave + k2 * t - k1
     psi_ocf = psi_ocf_wave + e2 * t - e1
     MaInv = np.array(MaOri.I)
