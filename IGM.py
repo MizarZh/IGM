@@ -53,6 +53,34 @@ def phipsi(phi, psi):
     return np.array([cos(phi) * cos(psi), sin(phi) * cos(psi), -sin(psi)])
 
 
+def F0(t, th):
+    return Ve * log(th / (th - t))
+
+
+def F1(t, th):
+    return th * F0(t, th) - Ve * t
+
+
+def F2(t, th):
+    return F0(t, th) * t - F1(t, th)
+
+
+def F3(t, th):
+    return F2(t, th) * th - 0.5 * Ve * t**2
+
+
+def F0_orbit(t, tho):
+    return Ve * log(tho / (tho - t))
+
+
+def F1_orbit(t, tho):
+    return F0_orbit(t, tho) * tho - Ve * t
+
+
+def F2_orbit(t, tho):
+    return F0_orbit(t, tho) * t - F1_orbit(t, tho)
+
+
 MoOri = My(i) * Mz(-deltaLambda) * My(-pi / 2) * Mz(BT) * My(AT)  # icf->rcf
 
 beta_c = f + omega
@@ -149,17 +177,13 @@ while (True):
         Ibrcf = Mo.dot(Ib)
         tau_o = Ve / (norm(Ibrcf[1:2]) * (F / m))
 
-        count = 0
-        # c part
-        A1 = Ve * log(tau_o / (tau_o - tc))
-        A2 = A1 * tau_o - Ve * tc
-        A3 = A1 * tc - A2
-        A4 = A3 * tau_o - 0.5 * Ve * tc**2
-
         # d part
-        beta_t = (V_star * tc * cos_theta_H_star + A3 * cos_theta_HC) / rocf[1]
+        k = (V_star * (cos_theta_H_star - 1) +
+             F2_orbit(tc, tau_o) * cos_theta_HC - F2(tc, tau)) / tc**2
+        beta_t = cos_theta_HC * (norm(V) * tc + F2(tc, tau) - k * tc *
+                                 (norm(V) + deltaV - norm(Vocf_c))) / rocf_c[1]
         beta_c = beta_e + beta_t
-
+        count = 0
         while (abs(tc - tc_pre) > epsilon):
             # f part
             tc_pre = tc
@@ -171,30 +195,27 @@ while (True):
             if count > 500:
                 raise Exception('错误')
         # g part
-        phi_ocf_wave = atan((rocf_c[1] - Vocf[1] - gocf[1]) /
-                            (rocf_c[0] - Vocf[0] - gocf[0] * tc))
-        P = A3 * cos(phi_ocf_wave)
-        Q = A4 * cos(phi_ocf_wave)
-        R = rocf_c[1] - rocf[
-            1] - Vocf[1] * tc - 0.5 * gocf[1] * tc**2 - A3 * sin(phi_ocf_wave)
-        delta_k = A1 * Q - A2 * P
-        k1 = A2 * R / delta_k
-        k2 = A1 * R / delta_k
+        phi_ocf_wave = atan((Vocf_c[1] - Vocf[1] - gocf[1] * tc) /
+                            (Vocf_c[0] - Vocf[0] - gocf[0] * tc))
+        psi_ocf_wave = asin((rocf_c[2] + Vocf[2] + gocf[2] * tc) / deltaV)
+        k1 = (rocf_c[1] - F2(tc, tau) * sin(phi_ocf_wave) -
+              0.5 * gocf[1] * tc**2 - Vocf[1] * tc - rocf[1]) / (
+                  (-F2(tc, tau) + F3(tc, tau) * F0(tc, tau) / F1(tc, tau)) *
+                  cos(phi_ocf_wave))
+        k2 = (rocf_c[1] - F2(tc, tau) * sin(phi_ocf_wave) -
+              0.5 * gocf[1] * tc**2 - Vocf[1] * tc - rocf[1]) * F0(tc, tau) / (
+                  (-F2(tc, tau) * F1(tc, tau) + F3(tc, tau) * F0(tc, tau)) *
+                  cos(phi_ocf_wave))
 
-        # psi 偏航角
-        B1 = Ve * log(tau / (tau - tc))
-        B2 = B1 * tau - Ve * tc
-        B3 = B1 * tc - B2
-        B4 = B3 * tau - 0.5 * Ve * tc**2
+        e1 = (rocf_c[2] - 0.5 * gocf[2] * tc**2 - Vocf[2] * tc - rocf[2] +
+              F2(tc, tau) * sin(psi_ocf_wave)) / (
+                  (F2(tc, tau) - F3(tc, tau) * F0(tc, tau) / F1(tc, tau)) *
+                  cos(psi_ocf_wave))
 
-        psi_ocf_wave = asin((rocf_c[2] + Vocf[2] + gocf[2] * tc) / B1)
-        E = B3 * cos(psi_ocf_wave)
-        G = B4 * cos(psi_ocf_wave)
-        H = rocf_c[2] - rocf[
-            2] - Vocf[2] * tc - 0.5 * gocf[2] * tc**2 + B3 * sin(psi_ocf_wave)
-        delta_e = B2 * E - B1 * G
-        e1 = B2 * H / delta_e
-        e2 = B1 * H / delta_e
+        e2 = (rocf_c[2] - 0.5 * gocf[2] * tc**2 - Vocf[2] * tc - rocf[2] +
+              F2(tc, tau) * sin(psi_ocf_wave)) * F0(tc, tau) / (
+                  (F2(tc, tau) * F1(tc, tau) - F3(tc, tau) * F0(tc, tau)) *
+                  cos(psi_ocf_wave))
 
     phi_ocf = phi_ocf_wave + k2 * t - k1
     psi_ocf = psi_ocf_wave + e2 * t - e1
@@ -223,5 +244,5 @@ while (True):
         break
     elif norm(r) < Re:
         print('坠毁')
-        print('t=',t,'tc=',tc)
+        print('t=', t, 'tc=', tc)
         break
